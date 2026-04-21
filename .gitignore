@@ -1,0 +1,34 @@
+# Ambientes Virtuais
+venv/
+env/
+.venv/
+
+# Variáveis de Ambiente e Segredos
+.env
+.env.*
+!.env.example
+
+# Arquivos compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Diretórios do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Caches e ferramentas de desenvolvimento
+.pytest_cache/
+.coverage
+.tox/
+build/
+dist/
+*.egg-info/
+.idea/
+.vscode/
+
+# Ignorar as gerações dinâmicas de base (opcional, remova se quiser versionar o output da spec/plan)
+# docs/*.md

@@ -1,0 +1,27 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lsdd_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: lsdd_openwebui
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OPENAI_API_BASE_URL=http://ollama:11434/v1
+      - OPENAI_API_KEY=ollama # Ollama não exige API key real
+      - WEBUI_AUTH=False
+    volumes:
+      - open-webui-data:/app/backend/data
+    depends_on:
+      - ollama
+
+volumes:
+  open-webui-data:
+  ollama-data:
