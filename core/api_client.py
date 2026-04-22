@@ -58,3 +58,29 @@ class OpenWebUIClient:
         link_response.raise_for_status()
             
         return link_response.json()
+
+    def get_knowledge_content(self, knowledge_id: str) -> str:
+        """
+        Recupera o conteúdo completo de todos os arquivos associados a uma Knowledge Base.
+        Isso é preferível ao RAG vetorial (chunking) quando precisamos que o LLM analise a especificação inteira.
+        """
+        url = f"{self.base_url}/api/v1/files/"
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        
+        files_data = response.json().get("items", []) if "items" in response.json() else response.json()
+        if not isinstance(files_data, list):
+            # Fallback para versões do OpenWebUI que retornam a lista direto
+            files_data = [files_data] if isinstance(files_data, dict) else files_data
+
+        content_parts = []
+        for file_item in files_data:
+            meta = file_item.get("meta", {})
+            # Em OpenWebUI, arquivos atrelados a uma KB possuem o ID da KB no meta.collection_name
+            if meta.get("collection_name") == knowledge_id or file_item.get("collection_name") == knowledge_id:
+                data = file_item.get("data", {})
+                content = data.get("content", "")
+                if content:
+                    content_parts.append(f"--- Documento: {meta.get('name', 'N/A')} ---\n{content}\n")
+                    
+        return "\n".join(content_parts)

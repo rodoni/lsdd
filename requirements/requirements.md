@@ -18,18 +18,3 @@ Estes descrevem as funcionalidades diretas e as interações que o usuário ter�
 12. **RF12 - Devolução de Itens:** O sistema deve prever uma funcionalidade para estorno de movimentações em caso de devolução de mercadoria ao fornecedor ou pelo cliente.
 
 ---
-
-## Requisitos Não Funcionais (RNF)
-Estes definem as qualidades técnicas, restrições e critérios de operação do software.
-
-13. **RNF01 - Desempenho:** O sistema deve processar consultas de saldo de estoque em menos de 2 segundos, mesmo com uma base de 10.000 itens.
-14. **RNF02 - Disponibilidade:** O software deve estar disponível para operação 99% do tempo durante o horário comercial.
-15. **RNF03 - Segurança (Autenticação):** O acesso ao sistema deve ser protegido por login e senha criptografada (ex: utilizando hashing como BCrypt).
-16. **RNF04 - Portabilidade:** Por ser para fins didáticos, o sistema deve ser multiplataforma, operando em navegadores modernos (Chrome, Firefox, Edge).
-17. **RNF05 - Backup:** O sistema deve realizar backup automático do banco de dados a cada 24 horas.
-18. **RNF06 - Usabilidade:** O sistema deve possuir uma interface responsiva, permitindo que o almoxarife realize consultas rápidas via tablet ou smartphone.
-19. **RNF07 - Integridade de Dados:** O sistema deve garantir que uma movimentação de estoque não seja processada se houver falha na conexão com o banco de dados (atomicidade).
-20. **RNF08 - Documentação Técnica:** O sistema deve ser desenvolvido seguindo padrões de codificação claros e possuir documentação de API (ex: Swagger/OpenAPI) para futuras integrações.
-
----
-

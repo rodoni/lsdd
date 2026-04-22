@@ -2,6 +2,21 @@ import os
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from .api_client import OpenWebUIClient
+
+def fetch_explicit_context(knowledge_id: str) -> str:
+    """Busca o texto completo de todos os documentos da base para contornar a fragmentação do RAG vetorial."""
+    base_url = os.getenv("OPENWEBUI_BASE_URL", "http://localhost:3000")
+    api_key = os.getenv("OPENWEBUI_API_KEY", "")
+    if not api_key:
+        return "Nenhum contexto encontrado (API Key não configurada)."
+    
+    try:
+        client = OpenWebUIClient(base_url, api_key)
+        content = client.get_knowledge_content(knowledge_id)
+        return content if content else "A base de conhecimento parece estar vazia ou os arquivos ainda não foram processados."
+    except Exception as e:
+        return f"Erro ao buscar contexto da base: {e}"
 
 def get_llm():
     """
@@ -31,27 +46,29 @@ def generate_specification(knowledge_id: str, model_name: str = None) -> str:
     Se não for usar o proxy do OpenWebUI, você precisará injetar o texto manualmente.
     """
     llm = get_llm()
-    
     if model_name:
         llm.model_name = model_name
 
+    context = fetch_explicit_context(knowledge_id)
+
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "Você é um Arquiteto de Software Especialista. Seu objetivo é analisar a base de conhecimento "
-                   "fornecida e unificar a visão do projeto em um documento de Especificação Técnica.\n"
-                   "O documento DEVE conter:\n"
+        ("system", "Você é um Arquiteto de Software Especialista. Seu objetivo é analisar os requisitos e "
+                   "unificar a visão do projeto em um documento de Especificação Técnica.\n"
+                   "O documento DEVE conter as seguintes seções:\n"
                    "1. Um overview arquitetural\n"
                    "2. Funcionalidades Principais\n"
                    "3. Requisitos Não-funcionais\n"
                    "4. Regras de Negócio chave.\n"
                    "Responda apenas com o conteúdo em Markdown puro, sem introduções extras."),
-        # Se você usa a infraestrutura do OpenWebUI como LLM Proxy, incluir a sintaxe "#" costuma disparar o RAG
-        ("human", "Analise a base de conhecimento de id '{knowledge_id}' (referência: #{knowledge_id}) "
-                  "e gere o documento spec.md associado a esta stack e infraestrutura.")
+        ("human", "Baseado exclusivamente nos documentos abaixo, gere o documento spec.md associado.\n\n"
+                  "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n"
+                  "{context}\n\n"
+                  "Gere o spec.md:")
     ])
 
     chain = prompt | llm | StrOutputParser()
     
-    return chain.invoke({"knowledge_id": knowledge_id})
+    return chain.invoke({"context": context})
 
 def generate_architecture_plan(knowledge_id: str, model_name: str = None) -> str:
     """
@@ -62,32 +79,33 @@ def generate_architecture_plan(knowledge_id: str, model_name: str = None) -> str
     llm = get_llm()
     if model_name:
         llm.model_name = model_name
+    context = fetch_explicit_context(knowledge_id)
         
     print("[1/3] Gerando diagrama de fluxo de dados (Sequência)...")
     seq_prompt = ChatPromptTemplate.from_messages([
         ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js do tipo 'sequenceDiagram' que descreva o fluxo de dados principal do sistema. Sem explicações adicionais."),
-        ("human", "Com base na base #{knowledge_id}, gere o diagrama de Sequência.")
+        ("human", "Com base na documentação abaixo, gere o diagrama de Sequência.\n\n{context}")
     ])
     
     print("[2/3] Gerando diagrama de classes/entidades (Class)...")
     class_prompt = ChatPromptTemplate.from_messages([
         ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js do tipo 'classDiagram' detalhando a estrutura de entidades, classes e relações. Sem explicações adicionais."),
-        ("human", "Com base na base #{knowledge_id}, gere o diagrama de Classes.")
+        ("human", "Com base na documentação abaixo, gere o diagrama de Classes.\n\n{context}")
     ])
     
     print("[3/3] Gerando diagrama de infraestrutura (Componentes)...")
     comp_prompt = ChatPromptTemplate.from_messages([
         ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js (graph TD ou C4) evidenciando os componentes do sistema, infraestrutura e integrações. Sem explicações adicionais."),
-        ("human", "Com base na base #{knowledge_id}, gere o diagrama de Componentes.")
+        ("human", "Com base na documentação abaixo, gere o diagrama de Componentes.\n\n{context}")
     ])
     
     seq_chain = seq_prompt | llm | StrOutputParser()
     class_chain = class_prompt | llm | StrOutputParser()
     comp_chain = comp_prompt | llm | StrOutputParser()
     
-    seq_result = seq_chain.invoke({"knowledge_id": knowledge_id})
-    class_result = class_chain.invoke({"knowledge_id": knowledge_id})
-    comp_result = comp_chain.invoke({"knowledge_id": knowledge_id})
+    seq_result = seq_chain.invoke({"context": context})
+    class_result = class_chain.invoke({"context": context})
+    comp_result = comp_chain.invoke({"context": context})
     
     plan_md = (
         "# Plano de Arquitetura\n\n"
@@ -109,6 +127,7 @@ def generate_tasks_backlog(knowledge_id: str, plan_content: str = None, model_na
     llm = get_llm()
     if model_name:
         llm.model_name = model_name
+    context = fetch_explicit_context(knowledge_id)
         
     system_prompt = (
         "Você é um Tech Lead e Engenheiro Sênior. Sua tarefa é quebrar a especificação e arquitetura "
@@ -119,13 +138,19 @@ def generate_tasks_backlog(knowledge_id: str, plan_content: str = None, model_na
     
     if plan_content:
         human_prompt = (
-            f"Com base na base de conhecimento #{{knowledge_id}} e no planejamento arquitetural a seguir:\n\n"
+            "Com base na documentação a seguir e no planejamento arquitetural:\n\n"
+            "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n"
+            f"{context}\n\n"
+            "--- PLANO ARQUITETURAL ---\n"
             f"```\n{plan_content}\n```\n\n"
             "Gere o checklist de tarefas de engenharia detalhado."
         )
     else:
         human_prompt = (
-            f"Com base na base de conhecimento #{{knowledge_id}}, gere o checklist de tarefas de engenharia detalhado."
+            "Com base na documentação a seguir:\n\n"
+            "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n"
+            f"{context}\n\n"
+            "Gere o checklist de tarefas de engenharia detalhado."
         )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -134,4 +159,4 @@ def generate_tasks_backlog(knowledge_id: str, plan_content: str = None, model_na
     ])
     
     chain = prompt | llm | StrOutputParser()
-    return chain.invoke({"knowledge_id": knowledge_id})
+    return chain.invoke({})
