@@ -5,8 +5,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .api_client import OpenWebUIClient
 
-def fetch_explicit_context(knowledge_id: str, use_rag: bool = False, query: str = "") -> str:
-    """Busca o texto completo ou trechos via RAG para contornar a fragmentação/limite de contexto."""
+def fetch_explicit_context(knowledge_id: str) -> str:
+    """Busca o texto completo de todos os documentos da base para contornar a fragmentação do RAG vetorial."""
     base_url = os.getenv("OPENWEBUI_BASE_URL", "http://localhost:3000")
     api_key = os.getenv("OPENWEBUI_API_KEY", "")
     if not api_key:
@@ -14,7 +14,7 @@ def fetch_explicit_context(knowledge_id: str, use_rag: bool = False, query: str 
     
     try:
         client = OpenWebUIClient(base_url, api_key)
-        content = client.get_knowledge_content(knowledge_id, use_rag=use_rag, query=query)
+        content = client.get_knowledge_content(knowledge_id)
         return content if content else "A base de conhecimento parece estar vazia ou os arquivos ainda não foram processados."
     except Exception as e:
         return f"Erro ao buscar contexto da base: {e}"
@@ -49,9 +49,11 @@ def generate_specification(knowledge_id: str, model_name: str = None, use_rag: b
     if model_name:
         llm.model_name = model_name
 
-    # Se estiver usando RAG, passamos uma query direcionada para a Spec
-    query = "funcionalidades, requisitos funcionais, requisitos não funcionais, regras de negócio" if use_rag else ""
-    context = fetch_explicit_context(knowledge_id, use_rag=use_rag, query=query)
+    if use_rag:
+        llm = llm.bind(extra_body={"files": [{"type": "collection", "id": knowledge_id}]})
+        context = "O CONTEXTO SERÁ FORNECIDO PELO SISTEMA DE RAG (OPENWEBUI)."
+    else:
+        context = fetch_explicit_context(knowledge_id)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", "Você é um Arquiteto de Software. Seu trabalho é LER os requisitos fornecidos pelo usuário e SINTETIZAR um documento técnico. NÃO invente informações. Use APENAS o que foi fornecido."),
@@ -80,8 +82,11 @@ def generate_architecture_plan(knowledge_id: str, model_name: str = None, use_ra
     if model_name:
         llm.model_name = model_name
 
-    query = "arquitetura, diagrama de sequencia, componentes, infraestrutura, fluxo de dados, diagramas UML" if use_rag else ""
-    context = fetch_explicit_context(knowledge_id, use_rag=use_rag, query=query)
+    if use_rag:
+        llm = llm.bind(extra_body={"files": [{"type": "collection", "id": knowledge_id}]})
+        context = "O CONTEXTO SERÁ FORNECIDO PELO SISTEMA DE RAG (OPENWEBUI)."
+    else:
+        context = fetch_explicit_context(knowledge_id)
         
     print("[1/5] Gerando diagrama de fluxo de dados (Sequência)...")
     seq_prompt = ChatPromptTemplate.from_messages([
@@ -150,8 +155,11 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
     if model_name:
         llm.model_name = model_name
 
-    query = "tarefas de desenvolvimento, épicos, backlog, implementação, infraestrutura, frontend, backend" if use_rag else ""
-    context = fetch_explicit_context(knowledge_id, use_rag=use_rag, query=query)
+    if use_rag:
+        llm = llm.bind(extra_body={"files": [{"type": "collection", "id": knowledge_id}]})
+        context = "O CONTEXTO SERÁ FORNECIDO PELO SISTEMA DE RAG (OPENWEBUI)."
+    else:
+        context = fetch_explicit_context(knowledge_id)
         
     system_prompt = (
         "Você é um Tech Lead e Engenheiro Sênior. Sua tarefa é quebrar a especificação e arquitetura "

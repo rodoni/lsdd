@@ -63,38 +63,11 @@ class OpenWebUIClient:
             
         return link_response.json()
 
-    def get_knowledge_content(self, knowledge_id: str, use_rag: bool = False, query: str = "") -> str:
+    def get_knowledge_content(self, knowledge_id: str) -> str:
         """
-        Recupera o conteúdo completo de todos os arquivos associados a uma Knowledge Base,
-        ou busca os trechos relevantes usando RAG se use_rag=True e houver uma query.
+        Recupera o conteúdo completo de todos os arquivos associados a uma Knowledge Base.
+        Isso é preferível ao RAG vetorial (chunking) quando precisamos que o LLM analise a especificação inteira.
         """
-        if use_rag and query:
-            url = f"{self.base_url}/api/v1/rag/query"
-            payload = {
-                "collection_names": [knowledge_id],
-                "query": query,
-                "k": 10
-            }
-            warnings.filterwarnings("ignore", category=InsecureRequestWarning)
-            response = requests.post(url, json=payload, headers=self.headers, verify=False)
-            
-            if response.status_code == 200:
-                docs = response.json().get('documents', [])
-                
-                # Trata diferentes formatos de retorno do RAG (dict vs string)
-                context_texts = []
-                for d in docs:
-                    if isinstance(d, dict) and 'content' in d:
-                        context_texts.append(d['content'])
-                    elif isinstance(d, str):
-                        context_texts.append(d)
-                        
-                if context_texts:
-                    return "\n\n---\n\n".join(context_texts)
-                return "Nenhum contexto encontrado via RAG para a requisição informada."
-            else:
-                return f"Falha na busca via RAG (HTTP {response.status_code}): {response.text}"
-
         url = f"{self.base_url}/api/v1/files/"
         warnings.filterwarnings("ignore", category=InsecureRequestWarning)
         response = requests.get(url, headers=self.headers,verify=False)
