@@ -1,7 +1,7 @@
 
 ---
 
-## Requisitos Funcionais (RF)
+## Requisitos Funcionais (RF) - Sistema de Controle de Estoque
 Estes descrevem as funcionalidades diretas e as interações que o usuário terá com o sistema.
 
 1.  **RF01 - Cadastro de Produtos:** O sistema deve permitir o registro de produtos contendo nome, descrição, código de barras (EAN), unidade de medida e categoria.

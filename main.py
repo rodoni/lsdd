@@ -57,21 +57,50 @@ def lsdd_base(directory, name):
     except Exception as e:
         click.secho(f"Erro durante a operação: {str(e)}", fg="red")
 
+@cli.command("list")
+def lsdd_list():
+    """
+    Lista todas as Knowledge Bases disponíveis no OpenWebUI.
+    """
+    click.echo("Buscando Knowledge Bases no OpenWebUI...")
+    base_url = os.getenv("OPENWEBUI_BASE_URL", "http://localhost:3000")
+    api_key = os.getenv("OPENWEBUI_API_KEY")
+
+    if not api_key:
+        click.secho("ERRO: OPENWEBUI_API_KEY não configurada no .env", fg="red")
+        return
+
+    client = OpenWebUIClient(base_url, api_key)
+    
+    try:
+        kbs = client.list_knowledge_bases()
+        if not kbs:
+            click.echo("Nenhuma Knowledge Base encontrada.")
+            return
+            
+        click.secho(f"\nEncontradas {len(kbs)} Knowledge Bases:\n", fg="green", bold=True)
+        for kb in kbs:
+            click.echo(f"  • Nome: {kb['name']}\n    ID:   {kb['id']}\n")
+            
+    except Exception as e:
+        click.secho(f"Erro ao listar Knowledge Bases: {str(e)}", fg="red")
+
 @cli.command("spec")
 @click.argument("knowledge_id", type=str)
 @click.option("--output", "-o", default="spec.md", help="Caminho do arquivo de saída (ex: docs/spec.md)")
-def lsdd_spec(knowledge_id, output):
+@click.option("--use-rag", is_flag=True, help="Usa RAG para buscar contexto em vez do arquivo completo.")
+def lsdd_spec(knowledge_id, output, use_rag):
     """
     Especificação: Gera um documento spec.md unificado utilizando a Knowledge Base.
     
     KNOWLEDGE_ID: O UUID da base gerada no passo 'base'.
     """
-    click.echo(f"Iniciando LSDD Spec (Definição)...")
+    click.echo(f"Iniciando LSDD Spec (Planejamento de Produto)...")
     click.echo(f"Knowledge ID alvo: {knowledge_id}")
     
     try:
         click.echo("Solicitando geração da especificação ao LLM. Isso pode levar alguns minutos...")
-        spec_content = generate_specification(knowledge_id)
+        spec_content = generate_specification(knowledge_id, use_rag=use_rag)
         
         with open(output, "w", encoding="utf-8") as f:
             f.write(spec_content)
@@ -84,18 +113,19 @@ def lsdd_spec(knowledge_id, output):
 @cli.command("plan")
 @click.argument("knowledge_id", type=str)
 @click.option("--output", "-o", default="plan.md", help="Caminho do arquivo de saída (ex: docs/plan.md)")
-def lsdd_plan(knowledge_id, output):
+@click.option("--use-rag", is_flag=True, help="Usa RAG para buscar contexto em vez do arquivo completo.")
+def lsdd_plan(knowledge_id, output, use_rag):
     """
-    Arquitetura: Traduz a especificação em diagramas estruturais Mermaid.js.
+    Arquitetura: Cria diagramas técnicos (Mermaid) baseados no knowledge gerado.
     
     KNOWLEDGE_ID: O UUID da base gerada no passo 'base'.
     """
-    click.echo(f"Iniciando LSDD Plan (Arquitetura)...")
+    click.echo(f"Iniciando LSDD Plan (Design Arquitetural)...")
     click.echo(f"Knowledge ID alvo: {knowledge_id}")
     
     try:
         click.echo("Processando múltiplos prompts de arquitetura. Aguarde...")
-        plan_content = generate_architecture_plan(knowledge_id)
+        plan_content = generate_architecture_plan(knowledge_id, use_rag=use_rag)
         
         with open(output, "w", encoding="utf-8") as f:
             f.write(plan_content)
@@ -107,26 +137,20 @@ def lsdd_plan(knowledge_id, output):
 
 @cli.command("tasks")
 @click.argument("knowledge_id", type=str)
-@click.option("--plan-file", "-p", type=click.Path(exists=True), help="Caminho opcional para o arquivo plan.md para dar mais contexto ao LLM.")
 @click.option("--output", "-o", default="tasks.md", help="Caminho do arquivo de saída (ex: docs/tasks.md)")
-def lsdd_tasks(knowledge_id, plan_file, output):
+@click.option("--use-rag", is_flag=True, help="Usa RAG para buscar contexto em vez do arquivo completo.")
+def lsdd_tasks(knowledge_id, output, use_rag):
     """
-    Implementação: Quebra o plano e os requisitos em unidades de trabalho (Backlog).
+    Implementação: Quebra a especificação em unidades de trabalho (Backlog).
     
     KNOWLEDGE_ID: O UUID da base gerada no passo 'base'.
     """
     click.echo(f"Iniciando LSDD Tasks (Implementação)...")
     click.echo(f"Knowledge ID alvo: {knowledge_id}")
     
-    plan_content = None
-    if plan_file:
-        click.echo(f"Lendo contexto arquitetural de: {plan_file}")
-        with open(plan_file, "r", encoding="utf-8") as f:
-            plan_content = f.read()
-    
     try:
         click.echo("Solicitando geração do Engineering Backlog. Aguarde...")
-        tasks_content = generate_tasks_backlog(knowledge_id, plan_content)
+        tasks_content = generate_tasks_backlog(knowledge_id, use_rag=use_rag)
         
         with open(output, "w", encoding="utf-8") as f:
             f.write(tasks_content)

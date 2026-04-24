@@ -1,4 +1,6 @@
 import requests
+import warnings
+from urllib3.exceptions import InsecureRequestWarning
 from pathlib import Path
 
 class OpenWebUIClient:
@@ -18,7 +20,8 @@ class OpenWebUIClient:
             "name": name,
             "description": description
         }
-        response = requests.post(url, json=payload, headers=self.headers)
+        warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+        response = requests.post(url, json=payload, headers=self.headers, verify=False)
         response.raise_for_status()
         
         data = response.json()
@@ -38,7 +41,8 @@ class OpenWebUIClient:
                 "file": (file_path.name, f, "text/markdown")
             }
             upload_headers = {"Authorization": self.headers["Authorization"]}
-            response = requests.post(upload_url, files=files, headers=upload_headers)
+            warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+            response = requests.post(upload_url, files=files, headers=upload_headers, verify=False)
             response.raise_for_status()
             
             upload_data = response.json()
@@ -53,19 +57,47 @@ class OpenWebUIClient:
         # Passo 2: Adicionar a relação na knowledge base
         link_url = f"{self.base_url}/api/v1/knowledge/{knowledge_id}/file/add"
         link_payload = {"file_id": file_id}
-        
-        link_response = requests.post(link_url, json=link_payload, headers=self.headers)
+        warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+        link_response = requests.post(link_url, json=link_payload, headers=self.headers, verify=False)
         link_response.raise_for_status()
             
         return link_response.json()
 
-    def get_knowledge_content(self, knowledge_id: str) -> str:
+    def get_knowledge_content(self, knowledge_id: str, use_rag: bool = False, query: str = "") -> str:
         """
-        Recupera o conteúdo completo de todos os arquivos associados a uma Knowledge Base.
-        Isso é preferível ao RAG vetorial (chunking) quando precisamos que o LLM analise a especificação inteira.
+        Recupera o conteúdo completo de todos os arquivos associados a uma Knowledge Base,
+        ou busca os trechos relevantes usando RAG se use_rag=True e houver uma query.
         """
+        if use_rag and query:
+            url = f"{self.base_url}/api/v1/rag/query"
+            payload = {
+                "collection_names": [knowledge_id],
+                "query": query,
+                "k": 10
+            }
+            warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+            response = requests.post(url, json=payload, headers=self.headers, verify=False)
+            
+            if response.status_code == 200:
+                docs = response.json().get('documents', [])
+                
+                # Trata diferentes formatos de retorno do RAG (dict vs string)
+                context_texts = []
+                for d in docs:
+                    if isinstance(d, dict) and 'content' in d:
+                        context_texts.append(d['content'])
+                    elif isinstance(d, str):
+                        context_texts.append(d)
+                        
+                if context_texts:
+                    return "\n\n---\n\n".join(context_texts)
+                return "Nenhum contexto encontrado via RAG para a requisição informada."
+            else:
+                return f"Falha na busca via RAG (HTTP {response.status_code}): {response.text}"
+
         url = f"{self.base_url}/api/v1/files/"
-        response = requests.get(url, headers=self.headers)
+        warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+        response = requests.get(url, headers=self.headers,verify=False)
         response.raise_for_status()
         
         files_data = response.json().get("items", []) if "items" in response.json() else response.json()
@@ -84,3 +116,20 @@ class OpenWebUIClient:
                     content_parts.append(f"--- Documento: {meta.get('name', 'N/A')} ---\n{content}\n")
                     
         return "\n".join(content_parts)
+
+    def list_knowledge_bases(self) -> list:
+        """
+        Lista todas as Knowledge Bases disponíveis no OpenWebUI, retornando apenas seus IDs e nomes.
+        """
+        url = f"{self.base_url}/api/v1/knowledge/"
+        warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+        response = requests.get(url, headers=self.headers, verify=False)
+        response.raise_for_status()
+        
+        data = response.json()
+        items = data.get("items", []) if isinstance(data, dict) and "items" in data else data
+        
+        if not isinstance(items, list):
+            items = [items] if isinstance(items, dict) else []
+            
+        return [{"id": item.get("id", "N/A"), "name": item.get("name", "N/A")} for item in items]

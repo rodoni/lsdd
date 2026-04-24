@@ -70,6 +70,11 @@ VLLM_MODEL="llama3-8b-instruct"
 
 As execuções operam numa topologia linear, onde o passo 1 produz o ID fundamental (`knowledge_id`). O UUID referenciado é a ponte semântica em todos os processos de "Reasoning".
 
+**💡 Nota sobre Modos de Contexto:**
+Os comandos `spec`, `plan` e `tasks` possuem agora dois modos de injeção de conhecimento:
+- **Modo Padrão (Full Context):** O script baixa 100% dos textos dos arquivos da base em memória e passa tudo junto no prompt. Recomendado para precisão máxima ao projetar a arquitetura.
+- **Modo Vector RAG (`--use-rag`):** O script envia uma query de busca para o OpenWebUI e injeta no prompt apenas os trechos vetorialmente mais relevantes. Fundamental para evitar lentidão e alucinações se a base for gigantesca (ex: 50+ documentos).
+
 ### 1. Ingestão Automática
 
 Passe sempre um diretório-raiz de documentação de regras de negócio originais. 
@@ -78,23 +83,30 @@ Passe sempre um diretório-raiz de documentação de regras de negócio originai
 python main.py base ~/meus_documentos/ "Zephyr Alpha Knowledge"
 ```
 
-### 2. Geração da Especificação
+### 2. Listar Knowledge Bases (KBs)
+
+Se você esqueceu ou perdeu o ID gerado, pode listar todas as bases cadastradas no OpenWebUI.
+```bash
+python main.py list
+```
+
+### 3. Geração da Especificação
 
 Sintetiza as milhares de palavras do contexto numa Spec rígida.
 ```bash
-python main.py spec <ID_DA_BASE> --output docs/spec.md
+python main.py spec <ID_DA_BASE> --output docs/spec.md [--use-rag]
 ```
 
-### 3. Geração do Design Arquitetural
+### 4. Geração do Design Arquitetural
 
 Gera o arquivo com base de renderização de arquitetura e infraestrutura (Sendo compatível com renderizadores live de Markdowns modernos).
 ```bash
-python main.py plan <ID_DA_BASE> --output docs/plan.md
+python main.py plan <ID_DA_BASE> --output docs/plan.md [--use-rag]
 ```
 
-### 4. Eng Checklist / Backlog
+### 5. Eng Checklist / Backlog
 
 Une a bagagem anterior e infere as "User Stories" / Tarefas técnicas primárias num layout em caixas de listagem:
 ```bash
-python main.py tasks <ID_DA_BASE> --plan-file docs/plan.md --output docs/tasks.md
+python main.py tasks <ID_DA_BASE> --output docs/tasks.md [--use-rag]
 ```
