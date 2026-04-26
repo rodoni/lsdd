@@ -1,0 +1,47 @@
+- [ ] **RF01 - Cadastro de Produtos** 
+  - [ ] Configurar formulário de cadastro de produtos (nome, descrição, código de barras EAN, unidade de medida e categoria)
+  - [ ] Criar regras de entrada dos dados.
+  - [ ] Adicionar botões para cada componente do formulário.
+- [ ] **RF02 - Gestão de Fornecedores** 
+  - [ ] Novo usuário será adiado como fornecedor.
+  - [ ] Adicionar campos de cadastro de fornecedores. (CNPJ, razão social e contato)
+  - [ ] Adicionar botões para cada componente do formulário.
+- [ ] **RF03 - Entrada de Mercadoria** 
+  - [ ] Novo usuário será adiado como fornecedor ou usuário adiado em linha.
+  - [ ] Adicionar campos de entrada de mercadorias (quantidade disponível, valor unitário e custo).
+  - [ ] Adicionar botões para cada componente do formulário.
+- [ ] **RF04 - Saída de Mercadoria** 
+  - [ ] Novo usuário será adiado como fornecedor ou usuário adiado em linha.
+  - [ ] Adicionar campos de saídas de mercadorias (quantidade, valor e status atual).
+  - [ ] Adicionar botões para cada componente do formulário.
+- [ ] **RF05 - Alerta de Estoque Mínimo** 
+  - [ ] Configurar alertas de estoque mínimo.
+  - [ ] Criar regras de entrada dos dados.
+  - [ ] Adicionar campos para salvar alertas.
+- [ ] **RF06 - Histórico de Movimentações** 
+  - [ ] Criar uma tabela ou grid para cadastro e visualização do historico de movimentações.
+  - [ ] Adicionar campos para inserir, editar e deletar movimentações.
+  - [ ] Adicionar regras de entrada dos dados.
+- [ ] **RF07 - Valorização de Estoque** 
+  - [ ] Criar uma função ou método que calcule o valor total do estoque usando métodos como PEPS (Primeiro que Entra, Primeiro que Sai) ou Custo Médio Ponderado.
+  - [ ] Adicionar botões para cada componente da tabela.
+- [ ] **RF08 - Relatório de Inventário** 
+  - [ ] Criar uma tabela ou grid para cadastro e visualização do inventário.
+  - [ ] Adicionar campos para inserir, editar e deletar itens.
+  - [ ] Adicionar regras de entrada dos dados.
+- [ ] **RF09 - Controle de Lotes e Validade** 
+  - [ ] Criar uma tabela ou grid para cadastro de lotes e validar a validade dos produtos (estoque minimo, vencimento).
+  - [ ] Adicionar campos para inserir, editar e deletar itens.
+  - [ ] Adicionar regras de entrada dos dados.
+- [ ] **RF10 - Gestão de Usuários e Perfis** 
+  - [ ] Criar uma tabela ou grid para cadastro de usuários e perfsiões.
+  - [ ] Adicionar campos para inserir, editar e deletar usuários.
+  - [ ] Adicionar regras de entrada dos dados.
+- [ ] **RF11 - Importação de XML de NF-e** 
+  - [ ] Novo usuário será adiado como fornecedor ou usuário adiado em linha.
+  - [ ] Adicionar campos para inserir e salvar XML do NF-e.
+  - [ ] Adicionar botões para cada componente do formulário.
+- [ ] **RF12 - Devolução de Itens** 
+  - [ ] Novo usuário será adiado como fornecedor ou usuário adiado em linha.
+  - [ ] Adicionar campos para registrar a devolução de itens (quantidade, valor e status atual).
+  - [ ] Adicionar botões para cada componente do formulário.

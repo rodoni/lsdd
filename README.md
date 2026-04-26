@@ -39,18 +39,14 @@ A aplicação é dividida em **quatro comandos** principais que englobam a vida 
 
 ## 🚀 Instalação e Configuração
 
-Certifique-se de ter Python `3.10+` instalado.
+Certifique-se de ter Python `3.10+` instalado. A instalação do projeto agora é automatizada e utiliza o `pyproject.toml` para gerenciar dependências e habilitar a CLI nativa.
 
 ```bash
-# 1. Crie o isolamento em virtual environment
-python -m venv venv
+# 1. Execute o script de setup (ele cria o venv, instala dependências e prepara o .env)
+./setup.sh
+
+# 2. Ative o ambiente virtual para habilitar o comando `lsdd`
 source venv/bin/activate
-
-# 2. Instale as engines e requests listados no projeto
-pip install -r requirements.txt
-
-# 3. Configure as variáveis
-cp .env.example .env
 ```
 
 **Parâmetros de Ambiente (`.env`):**
@@ -80,33 +76,33 @@ Os comandos `spec`, `plan` e `tasks` possuem agora dois modos de injeção de co
 Passe sempre um diretório-raiz de documentação de regras de negócio originais. 
 *(Ao final, a CLI te retorna um ID para ser anotado)*
 ```bash
-python main.py base ~/meus_documentos/ "Zephyr Alpha Knowledge"
+lsdd base ~/meus_documentos/ "Zephyr Alpha Knowledge"
 ```
 
 ### 2. Listar Knowledge Bases (KBs)
 
 Se você esqueceu ou perdeu o ID gerado, pode listar todas as bases cadastradas no OpenWebUI.
 ```bash
-python main.py list
+lsdd list
 ```
 
 ### 3. Geração da Especificação
 
 Sintetiza as milhares de palavras do contexto numa Spec rígida.
 ```bash
-python main.py spec <ID_DA_BASE> --output docs/spec.md [--use-rag]
+lsdd spec <ID_DA_BASE> --output docs/spec.md [--use-rag]
 ```
 
 ### 4. Geração do Design Arquitetural
 
 Gera o arquivo com base de renderização de arquitetura e infraestrutura (Sendo compatível com renderizadores live de Markdowns modernos).
 ```bash
-python main.py plan <ID_DA_BASE> --output docs/plan.md [--use-rag]
+lsdd plan <ID_DA_BASE> --output docs/plan.md [--use-rag]
 ```
 
 ### 5. Eng Checklist / Backlog
 
 Une a bagagem anterior e infere as "User Stories" / Tarefas técnicas primárias num layout em caixas de listagem:
 ```bash
-python main.py tasks <ID_DA_BASE> --output docs/tasks.md [--use-rag]
+lsdd tasks <ID_DA_BASE> --output docs/tasks.md [--use-rag]
 ```

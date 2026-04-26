@@ -88,60 +88,40 @@ def generate_architecture_plan(knowledge_id: str, model_name: str = None, use_ra
     else:
         context = fetch_explicit_context(knowledge_id)
         
-    print("[1/5] Gerando diagrama de fluxo de dados (Sequência)...")
+    print("[1/3] Gerando diagrama de fluxo (Flowchart)...")
+    flow_prompt = ChatPromptTemplate.from_messages([
+        ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js do tipo 'flowchart TD' que descreva o fluxo geral ou macroarquitetura do sistema. Sem explicações adicionais."),
+        ("human", "Com base na documentação abaixo, gere o diagrama de Fluxo.\n\n{context}")
+    ])
+
+    print("[2/3] Gerando diagrama de fluxo de dados (Sequência)...")
     seq_prompt = ChatPromptTemplate.from_messages([
         ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js do tipo 'sequenceDiagram' que descreva o fluxo de dados principal do sistema. Sem explicações adicionais."),
         ("human", "Com base na documentação abaixo, gere o diagrama de Sequência.\n\n{context}")
     ])
     
-    print("[2/5] Gerando diagrama de classes/entidades (Class)...")
+    print("[3/3] Gerando diagrama de classes/entidades (Class)...")
     class_prompt = ChatPromptTemplate.from_messages([
         ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js do tipo 'classDiagram' detalhando a estrutura de entidades, classes e relações. Sem explicações adicionais."),
         ("human", "Com base na documentação abaixo, gere o diagrama de Classes.\n\n{context}")
     ])
     
-    print("[3/5] Gerando diagrama de Casos de Uso (Use Case)...")
-    usecase_prompt = ChatPromptTemplate.from_messages([
-        ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js (use 'flowchart TD' ou 'graph TD') que represente um Diagrama de Casos de Uso, evidenciando as interações entre os atores (usuários/sistemas) e as funcionalidades principais do sistema. Sem explicações adicionais."),
-        ("human", "Com base na documentação abaixo, gere o diagrama de Casos de Uso.\n\n{context}")
-    ])
-
-    print("[4/5] Gerando diagrama de Atividades (Activity)...")
-    activity_prompt = ChatPromptTemplate.from_messages([
-        ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js (use 'flowchart TD' ou 'stateDiagram-v2') que represente um Diagrama de Atividades, descrevendo o fluxo passo a passo de um processo de negócio principal do sistema, incluindo decisões e ações. Sem explicações adicionais."),
-        ("human", "Com base na documentação abaixo, gere o diagrama de Atividades.\n\n{context}")
-    ])
-
-    print("[5/5] Gerando diagrama de Estados (State)...")
-    state_prompt = ChatPromptTemplate.from_messages([
-        ("system", "Você é um Arquiteto de Software. Gere APENAS um bloco de código Markdown com um diagrama Mermaid.js do tipo 'stateDiagram-v2' que represente um Diagrama de Estados, focando no ciclo de vida da entidade mais importante do sistema (ex: Status de Pedido, Status de Usuário). Sem explicações adicionais."),
-        ("human", "Com base na documentação abaixo, gere o diagrama de Estados.\n\n{context}")
-    ])
-    
+    flow_chain = flow_prompt | llm | StrOutputParser()
     seq_chain = seq_prompt | llm | StrOutputParser()
     class_chain = class_prompt | llm | StrOutputParser()
-    usecase_chain = usecase_prompt | llm | StrOutputParser()
-    activity_chain = activity_prompt | llm | StrOutputParser()
-    state_chain = state_prompt | llm | StrOutputParser()
     
+    flow_result = flow_chain.invoke({"context": context})
     seq_result = seq_chain.invoke({"context": context})
     class_result = class_chain.invoke({"context": context})
-    usecase_result = usecase_chain.invoke({"context": context})
-    activity_result = activity_chain.invoke({"context": context})
-    state_result = state_chain.invoke({"context": context})
     
     plan_md = (
         "# Plano de Arquitetura\n\n"
-        "## 1. Fluxo de Dados Principal (Sequência)\n\n"
+        "## 1. Fluxo Geral (Macroarquitetura)\n\n"
+        f"{flow_result}\n\n"
+        "## 2. Fluxo de Dados Principal (Sequência)\n\n"
         f"{seq_result}\n\n"
-        "## 2. Estrutura de Domínio / Classes\n\n"
-        f"{class_result}\n\n"
-        "## 3. Atores e Funcionalidades (Casos de Uso)\n\n"
-        f"{usecase_result}\n\n"
-        "## 4. Fluxo de Negócios (Atividades)\n\n"
-        f"{activity_result}\n\n"
-        "## 5. Ciclo de Vida e Mudanças de Estado (Estados)\n\n"
-        f"{state_result}\n"
+        "## 3. Estrutura de Domínio / Classes\n\n"
+        f"{class_result}\n"
     )
     
     return plan_md
@@ -162,15 +142,16 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
         context = fetch_explicit_context(knowledge_id)
         
     system_prompt = (
-        "Você é um Tech Lead e Engenheiro Sênior. Sua tarefa é quebrar a especificação e arquitetura "
+        "Você é um Tech Lead e Engenheiro Sênior. Sua tarefa é quebrar a especificação "
         "do sistema em um backlog de tarefas práticas de engenharia de software.\n"
         "Gere a saída em formato de lista de Checklist Markdown (ex: - [ ] Configurar boilerplate de testes).\n"
-        "Estruture as tarefas por domínios, épicos ou camadas lógicas (ex: Infraestrutura, Backend, Frontend, CI/CD) e associe cada tarefa a um numero de requisito, se houver. "
-        "Se não houver um requisito associado, deixe como N/A.\n"
-        "Lembrando que um requisito pode estar associado a mais de uma tarefa.\n"
-        "O formato de saída deve ser:"
+        "Estruture as tarefas por assuntos.\n\n"
+        "REGRAS OBRIGATÓRIAS:\n"
+        "1. TODOS os requisitos detalhados na documentação DEVEM obrigatoriamente ser cobertos por pelo menos uma task no backlog.\n"
+        "2. O formato de saída deve seguir os modelos abaixo:\n\n"
         "- [ ] **Título da Tarefa** (Requisito: Req. 1)\n"
-        "  - Descrição detalhada da tarefa.\n"
+        "  - Descrição detalhada da tarefa.\n\n"
+ 
     )
     
     human_prompt = (

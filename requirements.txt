@@ -1,6 +1,0 @@
-langchain
-langchain-community
-langchain-openai
-requests
-click
-python-dotenv
