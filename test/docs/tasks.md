@@ -1,157 +1,129 @@
 # Backlog de Tarefas
 
+## Produtos
+
+### 1. RF-01: Criação de Produtos
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** Esta tarefa requer a criação de produtos contendo nome, descrição e valores unitários (valores monetários). O sistema deve permitir a entrada de dados e armazenamento de dados em uma coleção. Os requisitos adicionais incluem o registro do fornecedor da unidade e cadastro do produtor.
+- **Assunto:** Produtos
+
+### 2. RF-02: Criação de Fornecedores
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** Esta tarefa requer o cadastro de fornecedores vinculados aos produtos. O sistema deve permitir a criação de novos fornecedores e associá-los aos produtos, incluindo CNPJ e contato.
+- **Assunto:** Produtos
+
+## Fornecedores
+
+### 3. RF-03: Sistema para monitorar estoques
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** O sistema deve permitir a entrada de mercadorias, atualização da quantidade disponível e registro do preço de custo.
+- **Assunto:** Fornecedores
+
+### 4. RF-04: Sistema para exibir estoques
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** O sistema deve permitir a saída de mercadorias e decrementar o saldo atual do estoque.
+- **Assunto:** Fornecedores
+
+## Notificação de QNTM (Quantidade Necessária para Segurança)
+
+### 5. RF-05: Emissão de Notificação Visual ou por E-mail
+- **Requisitos Relacionados:** RF-01, RF-06
+- **Descrição Detalhada:** O sistema deve emitir uma notificação visual ou por e-mail quando um item atingir a quantidade mínima de segurança definida.
+- **Assunto:** Notificação de QNTM (Quantidade Necessária para Segurança)
+
+### 6. RF-06: Emissão de Notificação Visual ou por E-mail
+- **Requisitos Relacionados:** RF-01, RF-06
+- **Descrição Detalhada:** O sistema deve emitir uma notificação visual ou por e-mail quando um item atingir a quantidade mínima de segurança definida.
+- **Assunto:** Notificação de QNTM (Quantidade Necessária para Segurança)
+
+## Relatório
+
+### 7. Tarefa 01
+- **Requisitos Relacionados:** Nenhum
+- **Descrição Detalhada:** Este é o relatório de desenvolvimento que será elaborado.
+- **Assunto:** Relatório
+
 ## Cadastro de Produtos
 
-### 1. RF-01 - Cadastro de Produtos
-- **Requisitos Relacionados:** REQ-002, REQ-003
-- **Descrição Detalhada:** Descrição detalhada da atividade a ser realizada: Criação e cadastros dos produtos no sistema.
+### 8. RF-01 - Cadastro de Produtos
+- **Requisitos Relacionados:** RF-02, RF-03
+- **Descrição Detalhada:** O sistema deve permitir o registro e cadastro de produtos através do campo nome, descrição e código de barras (EAN). Os fornecedores devem ser informados nessa célula.
 - **Assunto:** Cadastro de Produtos
 
-## Gerenciamento de Fornecedores
+## Gestão de Fornecedores
 
-### 2. RF-01: Implementação de gerenciamento de fornecedores
-- **Requisitos Relacionados:** RF-02, REQ-03
-- **Descrição Detalhada:** Desenvolver um sistema de gerenciamento de fornecedores que permita a criação, atualização e exclusão de registros.
-- **Assunto:** Gerenciamento de Fornecedores
+### 9. RF-02 - Gestão de Fornecedores
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** O sistema deve permitir a cadastro e registro de fornecedores, incluindo CNPJ, razão social e contato. Os produtos devem ser associados à esses dados.
+- **Assunto:** Gestão de Fornecedores
 
-### 3. RF-02: Implementação de login automático
-- **Requisitos Relacionados:** RF-01, REQ-04
-- **Descrição Detalhada:** Criar um sistema que permite a autenticação automática e que os usuários possam ser autenticados por qualquer método.
-- **Assunto:** Gerenciamento de Fornecedores
+## Entrada de Mercadoria
 
-### 4. RF-03: Implementação de otimização do sistema
-- **Requisitos Relacionados:** RF-01, REQ-05
-- **Descrição Detalhada:** Aumentar a velocidade e eficiência do sistema de gerenciamento de fornecedores, monitorando e executando operações.
-- **Assunto:** Gerenciamento de Fornecedores
+### 10. RF-03 - Entrada de Mercadoria
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** O sistema deve permitir o registro e entrada de mercadorias no campo estoque, incluindo nome, descrição, unidade de medida e categoria.
+- **Assunto:** Entrada de Mercadoria
 
-## Entradas e Saídas de Mercadorias
+## Saída de Mercadoria
 
-### 5. RF-03 - Entradas de Mercadorias
-- **Requisitos Relacionados:** RF-04
-- **Descrição Detalhada:** Requisito: Através da aplicação, os registros de entrada de mercadorias deverão ser registrados e armazenados para a classificação das mercadorias.
-- **Assunto:** Entradas e Saídas de Mercadorias
-
-### 6. RF-04 - Saídas de Mercadorias
-- **Requisitos Relacionados:** RF-03
-- **Descrição Detalhada:** Requisito: Através da aplicação, as mercadorias que foram vendidas ou transferidas devem ser armazenadas e listadas em um sistema de saída.
-- **Assunto:** Entradas e Saídas de Mercadorias
+### 11. RF-04 - Saída de Mercadoria
+- **Requisitos Relacionados:** RF-01, RF-02
+- **Descrição Detalhada:** O sistema deve permitir o registro e saída de mercadorias do estoque, incluindo nome, descrição, unidade de medida e valor.
+- **Assunto:** Saída de Mercadoria
 
 ## Alerta de Estoque Mínimo
 
-### 7. RF-06: Requisito: Alerta de estoque mínimo
-- **Requisitos Relacionados:** REQ-05
-- **Descrição Detalhada:** Este é o tópico que deve ser abordado no assunto 'Alerta de Estoque Mínimo'.
+### 12. RF-05 - Alerta de Estoque Mínimo
+- **Requisitos Relacionados:** RF-01, RF-02, RF-03
+- **Descrição Detalhada:** O sistema deve emitir uma notificação visual ou por e-mail quando o estoque atingir a quantidade mínima definida.
 - **Assunto:** Alerta de Estoque Mínimo
 
-## Histórico de Movimentações - RF-06
+## Histórico de Movimentações
 
-### 8. Histórico de Movimentações - RF-06
-- **Requisitos Relacionados:** RF-06
-- **Descrição Detalhada:** Se você tem histórico de movimentações, está preparado para analisar o que aconteceu durante o período em questão e identificar a receita e gasto da empresa.
-- **Assunto:** Histórico de Movimentações - RF-06
+### 13. RF-06 - Histórico de Movimentações
+- **Requisitos Relacionados:** RF-01, RF-02
+- **Descrição Detalhada:** O sistema deve gerar um histórico de movimentações, incluindo data, hora e usuário responsável.
+- **Assunto:** Histórico de Movimentações
 
-## Requisito: Valorização do estoque
+## Valorização de Estoque
 
-### 9. Valorização do Estoque
-- **Requisitos Relacionados:** RF-07
-- **Descrição Detalhada:** Determine e valorizar os produtos que estão fora de estoque, garantindo a produtividade do negócio.
-- **Assunto:** Requisito: Valorização do estoque
+### 14. RF-07 - Valorização de Estoque
+- **Requisitos Relacionados:** RF-01, RF-02
+- **Descrição Detalhada:** O sistema deve calcular o valor total do estoque utilizando métodos como PEPS (Primeiro que Entra, Primeiro que Sai) ou Custo Médio Ponderado.
+- **Assunto:** Valorização de Estoque
 
-## Relatório de Inventario
+## Relatório de Inventário
 
-### 10. Relatório de Inventario
-- **Requisitos Relacionados:** RF-08
-- **Descrição Detalhada:** Esta tarefa consiste em realizar um relatório sobre o inventário atualizado, incluindo informações como: o tipo de produto, a quantidade, o valor por unidade, etc.
-- **Assunto:** Relatório de Inventario
+### 15. RF-08 - Relatório de Inventário
+- **Requisitos Relacionados:** RF-01, RF-03
+- **Descrição Detalhada:** O sistema deve gerar um relatório em PDF ou Excel listando todos os itens em estoque e seu status atual.
+- **Assunto:** Relatório de Inventário
 
-## Controle de lote e validade
+## Controle de Lotes e Validade
 
-### 11. RF-09: Controle de lote e validade
-- **Requisitos Relacionados:** RF-10, RF-06
-- **Descrição Detalhada:** Descreção detalhada da atividade a ser realizada. Este deveria incluir o que cada tarefa contará.
-- **Assunto:** Controle de lote e validade
+### 16. RF-09 - Controle de Lotes e Validade
+- **Requisitos Relacionados:** RF-01, RF-02, RF-03
+- **Descrição Detalhada:** O sistema deve permitir a gerenciamento de lote e validade, incluindo criação de lote e validação das mercadorias.
+- **Assunto:** Controle de Lotes e Validade
 
 ## Gestão de Usuários e Perfis
 
-### 12. RF-10 - Gestão de Usuários e Perfis
-- **Requisitos Relacionados:** RF-001, RF-002
-- **Descrição Detalhada:** Este projeto busca gerenciar as informações dos usuários e perfis utilizadores do sistema, incluindo os dados pessoais dos usuários, seus permissões de acesso e informações sobre a configuração do sistema.
+### 17. RF-10 - Gestão de Usuários e Perfis
+- **Requisitos Relacionados:** RF-01, RF-02
+- **Descrição Detalhada:** O sistema deve permitir a criação de usuários, incluindo diferentes níveis de acesso (administrador, operador, almoxarife).
 - **Assunto:** Gestão de Usuários e Perfis
 
-## Importação de XML NF-e
+## Importação de XML de NF-e
 
-### 13. RF-001 - Importação de XML NF-e
-- **Requisitos Relacionados:** RF-12
-- **Descrição Detalhada:** Esta tarefa envia o arquivo XML para ser importado no sistema. Os requisitos relacionados ao assunto incluem a task RF-12.
-- **Assunto:** Importação de XML NF-e
+### 18. RF-11 - Importação de XML de NF-e
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** O sistema deve permitir a entrada de produtos via arquivo XML da Nota Fiscal Eletrônica (NF-e).
+- **Assunto:** Importação de XML de NF-e
 
 ## Devolução de Itens
 
-### 14. Devolução de Itens
-- **Requisitos Relacionados:** RF-07
-- **Descrição Detalhada:** Desenvolva uma tarefa que gere a devolução de itens, incluindo as informações relevantes.
+### 19. RF-12 - Devolução de Itens
+- **Requisitos Relacionados:** RF-01
+- **Descrição Detalhada:** O sistema deve prever a funcionalidade para o envio e recepção de itens devolvidos ao fornecedor ou pelo cliente.
 - **Assunto:** Devolução de Itens
-
-## Adicionar novos produtos ao estoque
-
-### 15. RF-05 - Cadastro de Produtos
-- **Requisitos Relacionados:** RF-01, RF-02
-- **Descrição Detalhada:** Permite a criação de novos produtos, incluindo nome, descrição, e-mail para o contato do fornecedor.
-- **Assunto:** Adicionar novos produtos ao estoque
-
-## Alerta sobre o estoque minimo
-
-### 16. RF-06 - Alerta de Estoque Mínimo
-- **Requisitos Relacionados:** RF-01, RF-03
-- **Descrição Detalhada:** Permite a notificação visual ou por e-mail quando um produto atinge a quantidade mínima de segurança.
-- **Assunto:** Alerta sobre o estoque minimo
-
-## Análise e valoração de estoques
-
-### 17. RF-07 - Valorização de Estoque
-- **Requisitos Relacionados:** RF-01, RF-04
-- **Descrição Detalhada:** Permite calcular e gerar valores do estoque, como PEPS ou custo medio ponderado.
-- **Assunto:** Análise e valoração de estoques
-
-## Relatório da inventário
-
-### 18. RF-08 - Relatório de Inventário
-- **Requisitos Relacionados:** RF-01, RF-02
-- **Descrição Detalhada:** Permite a gerar relatórios em PDF ou Excel fornecendo informações de status atual do estoque.
-- **Assunto:** Relatório da inventário
-
-## Gestão dos lotes e prazo de vencimento
-
-### 19. RF-09 - Controle de Lotes e Validade
-- **Requisitos Relacionados:** RF-01, RF-03
-- **Descrição Detalhada:** Permite a gestão do controle e validação de produtos por número de lote, incluindo data de vencimento.
-- **Assunto:** Gestão dos lotes e prazo de vencimento
-
-## Gestão dos usuários
-
-### 20. RF-10 - Gestão de Usuários e Perfis
-- **Requisitos Relacionados:** RF-02, RF-04
-- **Descrição Detalhada:** Permite a criação de usuários com diferentes níveis de acesso, incluindo Administrador, Operador e Almoxarife.
-- **Assunto:** Gestão dos usuários
-
-## Inclusão de produtos via importação
-
-### 21. RF-11 - Importação de XML de NF-e
-- **Requisitos Relacionados:** RF-03, RF-05
-- **Descrição Detalhada:** Permite a entrada de produtos através do arquivo XML da Nota Fiscal Eletrônica.
-- **Assunto:** Inclusão de produtos via importação
-
-## Funcionalidade para devoluções
-
-### 22. RF-12 - Devolução de Itens
-- **Requisitos Relacionados:** RF-04, RF-05
-- **Descrição Detalhada:** Permite a previsão da devolução de movimentações em caso de devolução ao fornecedor ou pelo cliente.
-- **Assunto:** Funcionalidade para devoluções
-
-## Consulta do estoque
-
-### 23. RF-13 - Consulta de Produtos
-- **Requisitos Relacionados:** RF-04, RF-05
-- **Descrição Detalhada:** Permite a consulta por um produto especifico e suas informações relevantes.
-- **Assunto:** Consulta do estoque
 
