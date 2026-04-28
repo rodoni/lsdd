@@ -130,6 +130,8 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
     """
     Usa o LLM para ler o conteúdo da base,
     gerando um backlog de tarefas em formato Markdown (checklist de engenharia).
+    Verifica também se todos os requisitos foram cobertos, e se não, 
+    faz prompts adicionais explicitamente para cada requisito faltante.
     """
     llm = get_llm()
     if model_name:
@@ -151,13 +153,12 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
         "2. O formato de saída deve seguir os modelos abaixo:\n\n"
         "- [ ] **Título da Tarefa** (Requisito: Req. 1)\n"
         "  - Descrição detalhada da tarefa.\n\n"
- 
     )
     
     human_prompt = (
         "Com base na documentação a seguir:\n\n"
         "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n"
-        f"{context}\n\n"
+        "{context}\n\n"
         "Gere o checklist de tarefas de engenharia detalhado."
     )
 
@@ -167,4 +168,70 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
     ])
     
     chain = prompt | llm | StrOutputParser()
-    return chain.invoke({})
+    initial_output = chain.invoke({"context": context})
+    
+    # --- Nova Lógica de Verificação de Requisitos Faltantes ---
+    verify_system_prompt = (
+        "Você é um auditor de requisitos. "
+        "Você deve verificar se TODOS os requisitos listados na sua base de conhecimento (documentação) "
+        "foram contemplados no checklist gerado.\n"
+        "Retorne APENAS uma lista separada por vírgula com os números ou identificadores dos requisitos "
+        "(ex: Req. 1, Req. 2, RF-03) que estão presentes na documentação mas NÃO foram citados no checklist.\n"
+        "Se todos os requisitos da documentação foram contemplados no checklist, ou se não houver requisitos explícitos na documentação, "
+        "responda EXATAMENTE a palavra: NENHUM."
+    )
+    
+    verify_human_prompt = (
+        "Aqui está o checklist gerado:\n\n{checklist}\n\n"
+        "A documentação de referência é:\n{context}\n\n"
+        "Quais requisitos da documentação NÃO foram citados no checklist? Retorne apenas a lista separada por vírgula ou NENHUM."
+    )
+    
+    verify_prompt_template = ChatPromptTemplate.from_messages([
+        ("system", verify_system_prompt),
+        ("human", verify_human_prompt)
+    ])
+    
+    verify_chain = verify_prompt_template | llm | StrOutputParser()
+    missing_reqs_response = verify_chain.invoke({
+        "checklist": initial_output,
+        "context": context
+    })
+    
+    missing_reqs_str = missing_reqs_response.strip()
+    
+    # Se encontrou requisitos não citados
+    if missing_reqs_str.upper() != "NENHUM" and missing_reqs_str:
+        # Extrai a lista de requisitos faltantes
+        missing_reqs = [r.strip() for r in missing_reqs_str.split(",") if r.strip()]
+        
+        adicionais_output = ""
+        for req in missing_reqs:
+            # Pula textos longos que possam ser alucinação do modelo
+            if len(req) > 50:
+                continue
+                
+            req_system_prompt = system_prompt
+            req_human_prompt = (
+                "O requisito '{req}' presente na documentação não foi contemplado anteriormente no checklist.\n"
+                "A documentação de referência é:\n{context}\n\n"
+                "Gere as tarefas de engenharia APENAS para cobrir o requisito '{req}', "
+                "seguindo rigorosamente as mesmas regras e formato de checklist definido no system prompt."
+            )
+            
+            req_prompt_template = ChatPromptTemplate.from_messages([
+                ("system", req_system_prompt),
+                ("human", req_human_prompt)
+            ])
+            
+            req_chain = req_prompt_template | llm | StrOutputParser()
+            req_output = req_chain.invoke({
+                "req": req,
+                "context": context
+            })
+            
+            adicionais_output += f"\n\n### Tarefas Adicionais para {req}\n\n{req_output}"
+            
+        return initial_output + adicionais_output
+
+    return initial_output
