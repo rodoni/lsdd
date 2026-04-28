@@ -7,10 +7,22 @@ from pydantic import BaseModel, Field
 from typing import List
 from .api_client import OpenWebUIClient
 
+class RequirementRef(BaseModel):
+    id: str = Field(description="Identificador do requisito (ex: REQ-001)")
+    resumo: str = Field(description="Resumo breve do requisito")
+
+class SubjectGroup(BaseModel):
+    assunto: str = Field(description="Nome do assunto/domínio técnico")
+    requisitos: List[RequirementRef] = Field(description="Requisitos pertencentes a este assunto")
+
+class SubjectList(BaseModel):
+    assuntos: List[SubjectGroup] = Field(description="Lista de assuntos com seus requisitos")
+
 class TaskFormat(BaseModel):
-    titulo: str = Field(description="O título curto e claro da task")
-    requisitos: List[str] = Field(description="Lista de números dos requisitos de software (ex: REQ-001)")
-    descricao: str = Field(description="Descrição detalhada da atividade")
+    titulo_da_task: str = Field(description="Título curto e claro da task")
+    requisitos_relacionados: List[str] = Field(description="Lista de identificadores dos requisitos relacionados a esta task (ex: REQ-001)")
+    descricao_detalhada: str = Field(description="Descrição detalhada da atividade a ser realizada")
+    assunto: str = Field(description="Assunto/domínio ao qual esta task pertence")
 
 class TaskList(BaseModel):
     tasks: List[TaskFormat] = Field(description="Lista de tarefas do backlog")
@@ -136,56 +148,154 @@ def generate_architecture_plan(knowledge_id: str, model_name: str = None, use_ra
     
     return plan_md
 
+def _resolve_context(knowledge_id: str, use_rag: bool, llm):
+    if use_rag:
+        llm = llm.bind(extra_body={"files": [{"type": "collection", "id": knowledge_id}]})
+        return "O CONTEXTO SERÁ FORNECIDO PELO SISTEMA DE RAG (OPENWEBUI).", llm
+    return fetch_explicit_context(knowledge_id), llm
+
 def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: bool = False) -> str:
     """
-    Usa o LLM para ler o conteúdo da base,
-    gerando um backlog de tarefas estruturado usando Pydantic.
+    Abordagem em 3 etapas:
+    1. Agrupa requisitos por assunto.
+    2. Cria tarefas para cada assunto.
+    3. Verifica cobertura e cria tarefas para requisitos não cobertos.
     """
     llm = get_llm()
     if model_name:
         llm.model_name = model_name
 
-    if use_rag:
-        llm = llm.bind(extra_body={"files": [{"type": "collection", "id": knowledge_id}]})
-        context = "O CONTEXTO SERÁ FORNECIDO PELO SISTEMA DE RAG (OPENWEBUI)."
-    else:
-        context = fetch_explicit_context(knowledge_id)
-        
-    parser = PydanticOutputParser(pydantic_object=TaskList)
-        
-    system_prompt = (
-        "Você é um Tech Lead e Engenheiro Sênior. Sua tarefa é quebrar a especificação "
-        "do sistema em um backlog de tarefas práticas de engenharia de software.\n"
-        "TODOS os requisitos detalhados na documentação DEVEM obrigatoriamente ser cobertos por pelo menos uma task no backlog.\n\n"
-        "{format_instructions}"
-    )
-    
-    human_prompt = (
-        "Com base na documentação a seguir:\n\n"
-        "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n"
-        "{context}\n\n"
-        "Gere o backlog de tarefas de engenharia detalhado."
-    )
+    context, llm = _resolve_context(knowledge_id, use_rag, llm)
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", human_prompt)
-    ])
-    
-    prompt = prompt.partial(format_instructions=parser.get_format_instructions())
-    
-    chain = prompt | llm | parser
-    
     try:
-        result = chain.invoke({"context": context})
-        
+        # ---- ETAPA 1: Agrupar requisitos por assunto ----
+        print("[1/3] Agrupando requisitos por assunto...")
+        subject_parser = PydanticOutputParser(pydantic_object=SubjectList)
+        subject_prompt = ChatPromptTemplate.from_messages([
+            ("system",
+             "Você é um Arquiteto de Software. Leia a documentação e identifique TODOS os requisitos. "
+             "Agrupe os requisitos por assunto/domínio técnico. "
+             "Cada requisito deve ter um identificador único (ex: REQ-001, RF-01, etc).\n\n"
+             "IMPORTANTE: Responda APENAS com um JSON válido no formato abaixo. NÃO inclua texto adicional, markdown ou explicações.\n\n"
+             "Formato esperado:\n"
+             '{{\n'
+             '  "assuntos": [\n'
+             '    {{\n'
+             '      "assunto": "Nome do Assunto",\n'
+             '      "requisitos": [\n'
+             '        {{ "id": "REQ-001", "resumo": "Resumo do requisito" }},\n'
+             '        {{ "id": "REQ-002", "resumo": "Resumo do requisito" }}\n'
+             '      ]\n'
+             '    }}\n'
+             '  ]\n'
+             '}}\n\n'
+             "{format_instructions}"),
+            ("human",
+             "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n{context}\n\n"
+             "Identifique TODOS os requisitos, atribua um ID único a cada um e agrupe-os por assunto. "
+             "Responda APENAS com o JSON.")
+        ]).partial(format_instructions=subject_parser.get_format_instructions())
+
+        subject_chain = subject_prompt | llm | subject_parser
+        subjects: SubjectList = subject_chain.invoke({"context": context})
+
+        all_req_ids = set()
+        for subj in subjects.assuntos:
+            for req in subj.requisitos:
+                all_req_ids.add(req.id)
+
+        print(f"   Encontrados {len(all_req_ids)} requisitos em {len(subjects.assuntos)} assuntos.")
+
+        # ---- ETAPA 2: Criar tarefas por assunto ----
+        print("[2/3] Gerando tarefas por assunto...")
+        task_parser = PydanticOutputParser(pydantic_object=TaskList)
+        all_tasks: list[TaskFormat] = []
+
+        for subj in subjects.assuntos:
+            req_list = "\n".join(f"- {r.id}: {r.resumo}" for r in subj.requisitos)
+            task_prompt = ChatPromptTemplate.from_messages([
+                ("system",
+                 "Você é um Tech Lead. Crie tarefas de engenharia práticas para implementar os requisitos "
+                 "do assunto fornecido. Cada requisito DEVE ser coberto por pelo menos uma tarefa.\n\n"
+                 "IMPORTANTE: Responda APENAS com um JSON válido. NÃO inclua texto adicional, markdown ou explicações.\n\n"
+                 "Formato esperado:\n"
+                 '{{\n'
+                 '  "tasks": [\n'
+                 '    {{\n'
+                 '      "titulo_da_task": "Título da task",\n'
+                 '      "requisitos_relacionados": ["REQ-001", "REQ-002"],\n'
+                 '      "descricao_detalhada": "Descrição detalhada da atividade",\n'
+                 '      "assunto": "Nome do assunto"\n'
+                 '    }}\n'
+                 '  ]\n'
+                 '}}\n\n'
+                 "{format_instructions}"),
+                ("human",
+                 "Assunto: {assunto}\n\n"
+                 "Requisitos:\n{requisitos}\n\n"
+                 "Crie as tarefas de engenharia para este assunto. Responda APENAS com o JSON.")
+            ]).partial(format_instructions=task_parser.get_format_instructions())
+
+            task_chain = task_prompt | llm | task_parser
+            result: TaskList = task_chain.invoke({"assunto": subj.assunto, "requisitos": req_list})
+            all_tasks.extend(result.tasks)
+
+        # ---- ETAPA 3: Verificar cobertura ----
+        print("[3/3] Verificando cobertura de requisitos...")
+        covered_req_ids = set()
+        for task in all_tasks:
+            for req_id in task.requisitos_relacionados:
+                covered_req_ids.add(req_id)
+
+        uncovered = all_req_ids - covered_req_ids
+        if uncovered:
+            print(f"   {len(uncovered)} requisitos não cobertos. Criando tarefas complementares...")
+            uncovered_list = "\n".join(f"- {rid}" for rid in sorted(uncovered))
+            coverage_prompt = ChatPromptTemplate.from_messages([
+                ("system",
+                 "Você é um Tech Lead. Os requisitos abaixo não foram cobertos por nenhuma tarefa. "
+                 "Crie tarefas para cobri-los. O campo 'assunto' deve ser preenchido com o domínio mais adequado.\n\n"
+                 "IMPORTANTE: Responda APENAS com um JSON válido. NÃO inclua texto adicional, markdown ou explicações.\n\n"
+                 "Formato esperado:\n"
+                 '{{\n'
+                 '  "tasks": [\n'
+                 '    {{\n'
+                 '      "titulo_da_task": "Título da task",\n'
+                 '      "requisitos_relacionados": ["REQ-001"],\n'
+                 '      "descricao_detalhada": "Descrição detalhada da atividade",\n'
+                 '      "assunto": "Nome do assunto"\n'
+                 '    }}\n'
+                 '  ]\n'
+                 '}}\n\n'
+                 "{format_instructions}"),
+                ("human",
+                 "Requisitos não cobertos:\n{uncovered}\n\n"
+                 "Contexto original:\n{context}\n\n"
+                 "Crie tarefas para cobrir estes requisitos. Responda APENAS com o JSON.")
+            ]).partial(format_instructions=task_parser.get_format_instructions())
+
+            coverage_chain = coverage_prompt | llm | task_parser
+            extra: TaskList = coverage_chain.invoke({"uncovered": uncovered_list, "context": context})
+            all_tasks.extend(extra.tasks)
+
+        # ---- Renderização final agrupada por assunto ----
+        from collections import OrderedDict
+        grouped: dict[str, list[TaskFormat]] = OrderedDict()
+        for task in all_tasks:
+            grouped.setdefault(task.assunto, []).append(task)
+
         md_output = "# Backlog de Tarefas\n\n"
-        for i, task in enumerate(result.tasks, 1):
-            reqs = ", ".join(task.requisitos) if task.requisitos else "Nenhum"
-            md_output += f"### {i}. {task.titulo}\n"
-            md_output += f"- **Requisitos:** {reqs}\n"
-            md_output += f"- **Descrição:** {task.descricao}\n\n"
-            
+        task_num = 1
+        for assunto, tasks in grouped.items():
+            md_output += f"## {assunto}\n\n"
+            for task in tasks:
+                reqs = ", ".join(task.requisitos_relacionados) if task.requisitos_relacionados else "Nenhum"
+                md_output += f"### {task_num}. {task.titulo_da_task}\n"
+                md_output += f"- **Requisitos Relacionados:** {reqs}\n"
+                md_output += f"- **Descrição Detalhada:** {task.descricao_detalhada}\n"
+                md_output += f"- **Assunto:** {task.assunto}\n\n"
+                task_num += 1
+
         return md_output
     except Exception as e:
         return f"Erro ao gerar o backlog estruturado: {str(e)}"
