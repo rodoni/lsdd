@@ -2,8 +2,18 @@ import os
 import httpx
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
+from pydantic import BaseModel, Field
+from typing import List
 from .api_client import OpenWebUIClient
+
+class TaskFormat(BaseModel):
+    titulo: str = Field(description="O título curto e claro da task")
+    requisitos: List[str] = Field(description="Lista de números dos requisitos de software (ex: REQ-001)")
+    descricao: str = Field(description="Descrição detalhada da atividade")
+
+class TaskList(BaseModel):
+    tasks: List[TaskFormat] = Field(description="Lista de tarefas do backlog")
 
 def fetch_explicit_context(knowledge_id: str) -> str:
     """Busca o texto completo de todos os documentos da base para contornar a fragmentação do RAG vetorial."""
@@ -129,9 +139,7 @@ def generate_architecture_plan(knowledge_id: str, model_name: str = None, use_ra
 def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: bool = False) -> str:
     """
     Usa o LLM para ler o conteúdo da base,
-    gerando um backlog de tarefas em formato Markdown (checklist de engenharia).
-    Verifica também se todos os requisitos foram cobertos, e se não, 
-    faz prompts adicionais explicitamente para cada requisito faltante.
+    gerando um backlog de tarefas estruturado usando Pydantic.
     """
     llm = get_llm()
     if model_name:
@@ -143,23 +151,20 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
     else:
         context = fetch_explicit_context(knowledge_id)
         
+    parser = PydanticOutputParser(pydantic_object=TaskList)
+        
     system_prompt = (
         "Você é um Tech Lead e Engenheiro Sênior. Sua tarefa é quebrar a especificação "
         "do sistema em um backlog de tarefas práticas de engenharia de software.\n"
-        "Gere a saída em formato de lista de Checklist Markdown (ex: - [ ] Configurar boilerplate de testes).\n"
-        "Estruture as tarefas por assuntos.\n\n"
-        "REGRAS OBRIGATÓRIAS:\n"
-        "1. TODOS os requisitos detalhados na documentação DEVEM obrigatoriamente ser cobertos por pelo menos uma task no backlog.\n"
-        "2. O formato de saída deve seguir os modelos abaixo:\n\n"
-        "- [ ] **Título da Tarefa** (Requisito: Req. 1)\n"
-        "  - Descrição detalhada da tarefa.\n\n"
+        "TODOS os requisitos detalhados na documentação DEVEM obrigatoriamente ser cobertos por pelo menos uma task no backlog.\n\n"
+        "{format_instructions}"
     )
     
     human_prompt = (
         "Com base na documentação a seguir:\n\n"
         "--- DOCUMENTAÇÃO DE REFERÊNCIA ---\n"
         "{context}\n\n"
-        "Gere o checklist de tarefas de engenharia detalhado."
+        "Gere o backlog de tarefas de engenharia detalhado."
     )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -167,71 +172,20 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
         ("human", human_prompt)
     ])
     
-    chain = prompt | llm | StrOutputParser()
-    initial_output = chain.invoke({"context": context})
+    prompt = prompt.partial(format_instructions=parser.get_format_instructions())
     
-    # --- Nova Lógica de Verificação de Requisitos Faltantes ---
-    verify_system_prompt = (
-        "Você é um auditor de requisitos. "
-        "Você deve verificar se TODOS os requisitos listados na sua base de conhecimento (documentação) "
-        "foram contemplados no checklist gerado.\n"
-        "Retorne APENAS uma lista separada por vírgula com os números ou identificadores dos requisitos "
-        "(ex: Req. 1, Req. 2, RF-03) que estão presentes na documentação mas NÃO foram citados no checklist.\n"
-        "Se todos os requisitos da documentação foram contemplados no checklist, ou se não houver requisitos explícitos na documentação, "
-        "responda EXATAMENTE a palavra: NENHUM."
-    )
+    chain = prompt | llm | parser
     
-    verify_human_prompt = (
-        "Aqui está o checklist gerado:\n\n{checklist}\n\n"
-        "A documentação de referência é:\n{context}\n\n"
-        "Quais requisitos da documentação NÃO foram citados no checklist? Retorne apenas a lista separada por vírgula ou NENHUM."
-    )
-    
-    verify_prompt_template = ChatPromptTemplate.from_messages([
-        ("system", verify_system_prompt),
-        ("human", verify_human_prompt)
-    ])
-    
-    verify_chain = verify_prompt_template | llm | StrOutputParser()
-    missing_reqs_response = verify_chain.invoke({
-        "checklist": initial_output,
-        "context": context
-    })
-    
-    missing_reqs_str = missing_reqs_response.strip()
-    
-    # Se encontrou requisitos não citados
-    if missing_reqs_str.upper() != "NENHUM" and missing_reqs_str:
-        # Extrai a lista de requisitos faltantes
-        missing_reqs = [r.strip() for r in missing_reqs_str.split(",") if r.strip()]
+    try:
+        result = chain.invoke({"context": context})
         
-        adicionais_output = ""
-        for req in missing_reqs:
-            # Pula textos longos que possam ser alucinação do modelo
-            if len(req) > 50:
-                continue
-                
-            req_system_prompt = system_prompt
-            req_human_prompt = (
-                "O requisito '{req}' presente na documentação não foi contemplado anteriormente no checklist.\n"
-                "A documentação de referência é:\n{context}\n\n"
-                "Gere as tarefas de engenharia APENAS para cobrir o requisito '{req}', "
-                "seguindo rigorosamente as mesmas regras e formato de checklist definido no system prompt."
-            )
+        md_output = "# Backlog de Tarefas\n\n"
+        for i, task in enumerate(result.tasks, 1):
+            reqs = ", ".join(task.requisitos) if task.requisitos else "Nenhum"
+            md_output += f"### {i}. {task.titulo}\n"
+            md_output += f"- **Requisitos:** {reqs}\n"
+            md_output += f"- **Descrição:** {task.descricao}\n\n"
             
-            req_prompt_template = ChatPromptTemplate.from_messages([
-                ("system", req_system_prompt),
-                ("human", req_human_prompt)
-            ])
-            
-            req_chain = req_prompt_template | llm | StrOutputParser()
-            req_output = req_chain.invoke({
-                "req": req,
-                "context": context
-            })
-            
-            adicionais_output += f"\n\n### Tarefas Adicionais para {req}\n\n{req_output}"
-            
-        return initial_output + adicionais_output
-
-    return initial_output
+        return md_output
+    except Exception as e:
+        return f"Erro ao gerar o backlog estruturado: {str(e)}"
