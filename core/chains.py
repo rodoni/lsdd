@@ -66,7 +66,7 @@ def get_llm():
     base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
     api_key = os.getenv("VLLM_API_KEY", "none")
     model = os.getenv("VLLM_MODEL", "llama3-8b-instruct")
-    client = httpx.Client(verify=False, timeout=60)
+    client = httpx.Client(verify=False, timeout=300)
     
     return ChatOpenAI(
         base_url=base_url,
@@ -169,12 +169,11 @@ def _resolve_context(knowledge_id: str, use_rag: bool, llm):
 
 def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: bool = False) -> str:
     """
-    Abordagem em 4 etapas:
-    1. Identifica todos os requisitos e assuntos, relacionando-os.
-    2. Cria tarefas por assunto.
-    3. Verifica cobertura e cria tarefas para requisitos não cobertos.
-    4. Renderiza o backlog agrupado por assunto.
+    Abordagem em 2 etapas (otimizada para modelos de reasoning):
+    1. Extrai requisitos e assuntos.
+    2. Gera TODAS as tarefas em uma única chamada LLM.
     """
+    import time
     llm = get_llm()
     if model_name:
         llm.model_name = model_name
@@ -182,8 +181,9 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
     context, llm = _resolve_context(knowledge_id, use_rag, llm)
 
     try:
-        # ---- ETAPA 1: Identificar requisitos, assuntos e suas relações ----
-        print("[1/4] Identificando requisitos e assuntos...")
+        # ---- ETAPA 1: Identificar requisitos e assuntos ----
+        print("[1/2] Identificando requisitos e assuntos...")
+        t0 = time.time()
         extraction_parser = PydanticOutputParser(pydantic_object=RequirementSubjectExtraction)
         extraction_prompt = ChatPromptTemplate.from_messages([
             ("system",
@@ -210,87 +210,58 @@ def generate_tasks_backlog(knowledge_id: str, model_name: str = None, use_rag: b
         extraction_chain = extraction_prompt | llm | RunnableLambda(_clean_llm_output) | extraction_parser
         extraction: RequirementSubjectExtraction = extraction_chain.invoke({"context": context})
 
-        all_req_ids = {r.id for r in extraction.requisitos}
         req_lookup = {r.id: r.resumo for r in extraction.requisitos}
-        print(f"   {len(all_req_ids)} requisitos em {len(extraction.assuntos)} assuntos.")
+        print(f"   {len(req_lookup)} requisitos em {len(extraction.assuntos)} assuntos. ({time.time()-t0:.1f}s)")
 
-        # ---- ETAPA 2: Gerar tarefas por assunto ----
-        print("[2/4] Gerando tarefas por assunto...")
+        # ---- ETAPA 2: Gerar TODAS as tarefas em uma única chamada ----
+        print("[2/2] Gerando backlog de tarefas...")
+        t1 = time.time()
+
+        req_list_parts = []
+        for r in extraction.requisitos:
+            req_list_parts.append(f"- {r.id}: {r.resumo}")
+        req_list_str = "\n".join(req_list_parts)
+
+        subj_list_parts = []
+        for s in extraction.assuntos:
+            ids = ", ".join(s.requisito_ids)
+            subj_list_parts.append(f"- {s.assunto} (requisitos: {ids})")
+        subj_list_str = "\n".join(subj_list_parts)
+
         task_parser = PydanticOutputParser(pydantic_object=TaskList)
-        all_tasks: list[TaskFormat] = []
+        task_prompt = ChatPromptTemplate.from_messages([
+            ("system",
+             "Você é um Tech Lead sênior. Crie tarefas de engenharia práticas e detalhadas para implementar "
+             "TODOS os requisitos listados, organizados por assunto.\n\n"
+             "REGRAS:\n"
+             "- Cada requisito DEVE ser coberto por pelo menos uma tarefa.\n"
+             "- Agrupe as tarefas por assunto usando o campo 'assunto'.\n"
+             "- As tarefas devem ser prontas para um desenvolvedor executar.\n\n"
+             "IMPORTANTE: Responda APENAS com JSON válido. NÃO inclua texto adicional, markdown ou explicações.\n\n"
+             "Formato esperado:\n"
+             '{{\n'
+             '  "tasks": [\n'
+             '    {{\n'
+             '      "titulo_da_task": "Título da task",\n'
+             '      "assunto": "Nome do assunto",\n'
+             '      "requisitos_relacionados": ["RF-01"],\n'
+             '      "descricao_detalhada": "Descrição detalhada da atividade"\n'
+             '    }}\n'
+             '  ]\n'
+             '}}\n\n'
+             "{format_instructions}"),
+            ("human",
+             "Assuntos identificados:\n{assuntos}\n\n"
+             "Requisitos completos:\n{requisitos}\n\n"
+             "Crie as tarefas de engenharia cobrindo TODOS os requisitos. Responda APENAS com o JSON.")
+        ]).partial(format_instructions=task_parser.get_format_instructions())
 
-        for subj in extraction.assuntos:
-            req_details = []
-            for rid in subj.requisito_ids:
-                req_details.append(f"- {rid}: {req_lookup.get(rid, 'Sem descrição')}")
-            req_list = "\n".join(req_details)
+        task_chain = task_prompt | llm | RunnableLambda(_clean_llm_output) | task_parser
+        result: TaskList = task_chain.invoke({"assuntos": subj_list_str, "requisitos": req_list_str})
+        all_tasks = result.tasks
+        print(f"   {len(all_tasks)} tarefas geradas. ({time.time()-t1:.1f}s)")
 
-            task_prompt = ChatPromptTemplate.from_messages([
-                ("system",
-                 "Você é um Tech Lead. Crie tarefas de engenharia práticas para implementar os requisitos "
-                 "do assunto fornecido. Cada requisito DEVE ser coberto por pelo menos uma tarefa.\n\n"
-                 "IMPORTANTE: Responda APENAS com JSON válido. NÃO inclua texto adicional, markdown ou explicações.\n\n"
-                 "Formato esperado:\n"
-                 '{{\n'
-                 '  "tasks": [\n'
-                 '    {{\n'
-                 '      "titulo_da_task": "Título da task",\n'
-                 '      "assunto": "{assunto}",\n'
-                 '      "requisitos_relacionados": ["RF-01"],\n'
-                 '      "descricao_detalhada": "Descrição detalhada da atividade"\n'
-                 '    }}\n'
-                 '  ]\n'
-                 '}}\n\n'
-                 "{format_instructions}"),
-                ("human",
-                 "Assunto: {assunto}\n\n"
-                 "Requisitos:\n{requisitos}\n\n"
-                 "Crie as tarefas de engenharia para este assunto. Responda APENAS com o JSON.")
-            ]).partial(format_instructions=task_parser.get_format_instructions())
-
-            task_chain = task_prompt | llm | RunnableLambda(_clean_llm_output) | task_parser
-            result: TaskList = task_chain.invoke({"assunto": subj.assunto, "requisitos": req_list})
-            all_tasks.extend(result.tasks)
-
-        # ---- ETAPA 3: Verificar cobertura ----
-        print("[3/4] Verificando cobertura de requisitos...")
-        covered = set()
-        for t in all_tasks:
-            covered.update(t.requisitos_relacionados)
-
-        uncovered = all_req_ids - covered
-        if uncovered:
-            print(f"   {len(uncovered)} requisitos não cobertos. Criando tarefas complementares...")
-            unc_details = [f"- {rid}: {req_lookup.get(rid, '')}" for rid in sorted(uncovered)]
-            unc_list = "\n".join(unc_details)
-            coverage_prompt = ChatPromptTemplate.from_messages([
-                ("system",
-                 "Você é um Tech Lead. Os requisitos abaixo não foram cobertos por nenhuma tarefa. "
-                 "Crie tarefas para cobri-los. O campo 'assunto' deve ser preenchido com o domínio mais adequado.\n\n"
-                 "IMPORTANTE: Responda APENAS com JSON válido. NÃO inclua texto adicional, markdown ou explicações.\n\n"
-                 "Formato esperado:\n"
-                 '{{\n'
-                 '  "tasks": [\n'
-                 '    {{\n'
-                 '      "titulo_da_task": "Título da task",\n'
-                 '      "assunto": "Nome do assunto",\n'
-                 '      "requisitos_relacionados": ["RF-01"],\n'
-                 '      "descricao_detalhada": "Descrição detalhada da atividade"\n'
-                 '    }}\n'
-                 '  ]\n'
-                        "{format_instructions}"),
-                ("human",
-                 "Requisitos não cobertos:\n{uncovered}\n\n"
-                 "Contexto original:\n{context}\n\n"
-                 "Crie tarefas para cobrir estes requisitos. Responda APENAS com o JSON.")
-            ]).partial(format_instructions=task_parser.get_format_instructions())
-
-            coverage_chain = coverage_prompt | llm | RunnableLambda(_clean_llm_output) | task_parser
-            extra: TaskList = coverage_chain.invoke({"uncovered": unc_list, "context": context})
-            all_tasks.extend(extra.tasks)
-
-        # ---- ETAPA 4: Renderização final agrupada por assunto ----
-        print("[4/4] Renderizando backlog...")
+        # ---- Renderização final agrupada por assunto ----
         from collections import OrderedDict
         grouped: dict[str, list[TaskFormat]] = OrderedDict()
         for task in all_tasks:

@@ -6,6 +6,13 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
@@ -15,7 +22,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - OPENAI_API_BASE_URL=http://ollama:11434/v1
-      - OPENAI_API_KEY=ollama # Ollama não exige API key real
+      - OPENAI_API_KEY=ollama
       - WEBUI_AUTH=False
     volumes:
       - open-webui-data:/app/backend/data
