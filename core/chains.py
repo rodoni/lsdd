@@ -9,6 +9,13 @@ from pydantic import BaseModel, Field
 from typing import List
 from .api_client import OpenWebUIClient
 
+def _fix_truncated_json(text: str) -> str:
+    open_braces = text.count("{") - text.count("}")
+    open_brackets = text.count("[") - text.count("]")
+    if open_braces > 0 or open_brackets > 0:
+        text += "]" * max(open_brackets, 0) + "}" * max(open_braces, 0)
+    return text
+
 def _clean_llm_output(output) -> str:
     text = output.content if hasattr(output, 'content') else str(output)
     text = re.sub(r"<think\b[^>]*>.*?</think\s*>", "", text, flags=re.DOTALL)
@@ -17,6 +24,10 @@ def _clean_llm_output(output) -> str:
     match = re.search(r"\{.*\}", text, flags=re.DOTALL)
     if match:
         text = match.group(0)
+    else:
+        match = re.search(r"\{.*", text, flags=re.DOTALL)
+        if match:
+            text = _fix_truncated_json(match.group(0))
     return text.strip()
 
 class RequirementRef(BaseModel):
@@ -66,7 +77,8 @@ def get_llm():
     base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
     api_key = os.getenv("VLLM_API_KEY", "none")
     model = os.getenv("VLLM_MODEL", "llama3-8b-instruct")
-    client = httpx.Client(verify=False, timeout=300)
+    is_local = "localhost" in base_url or "127.0.0.1" in base_url
+    client = httpx.Client(verify=not is_local, timeout=300)
     
     return ChatOpenAI(
         base_url=base_url,
